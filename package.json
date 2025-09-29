@@ -11,7 +11,8 @@
     "lint": "expo lint",
     "build:web": "npx expo export --platform web --output-dir dist",
     "preview:web": "npx serve dist",
-    "postbuild:web": "cpy public/* dist/ --parents"
+    "postbuild:web": "cpy public/* dist/ --parents",
+    "vercel-build": "npm run build:web && npm run postbuild:web"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
