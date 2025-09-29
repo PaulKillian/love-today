@@ -11,7 +11,7 @@
     "lint": "expo lint",
     "build:web": "npx expo export --platform web --output-dir dist",
     "preview:web": "npx serve dist",
-    "postbuild:web": "cpy public/* dist/ --parents",
+    "postbuild:web": "cpy-cli \"public/**\" dist/ --parents",
     "vercel-build": "npm run build:web && npm run postbuild:web"
   },
   "dependencies": {
@@ -56,10 +56,10 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
+    "cpy-cli": "^5.0.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
-    "typescript": "~5.9.2",
-    "cpy-cli": "^5.0.0"
+    "typescript": "~5.9.2"
   },
   "private": true,
   "engines": {
