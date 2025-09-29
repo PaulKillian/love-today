@@ -1,3 +1,10 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/" }]
+  "rewrites": [
+    { "source": "/sw.js", "destination": "/sw.js" },
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/(.*)", "destination": "/" }
+  ],
+  "crons": [
+    { "path": "/api/push/send", "schedule": "*/5 * * * *" }
+  ]
 }
