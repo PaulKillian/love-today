@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { cancelAllLocal, ensureNotiPermissions, scheduleDailyLocal } from "../../lib/notify";
+import { enablePush } from "../../lib/push";
 import { useBreakpoints } from "../../lib/responsive";
 import { loadPrefs, savePrefs } from "../../lib/storage";
 import { ensureWebPushSubscription } from "../../lib/webpush";
@@ -37,6 +38,20 @@ export default function Settings() {
   const [webPushPermission, setWebPushPermission] = useState<"granted" | "denied" | "default">("default");
   const [webPushSubscribed, setWebPushSubscribed] = useState<boolean>(false);
   const showWebPushRow = Platform.OS === "web";
+  const [status, setStatus] = useState<string>("");
+
+  const onEnable = async () => {
+    try {
+      if (Platform.OS !== "web") {
+        setStatus("Push via web only. Open this site in a browser and Add to Home Screen (iOS).");
+        return;
+      }
+      await enablePush();
+      setStatus("Enabled! You’ll get daily reminders.");
+    } catch (e: any) {
+      setStatus(e?.message || String(e));
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -209,6 +224,8 @@ export default function Settings() {
               <Text style={styles.pillText}>Add a child</Text>
             </Pressable>
           </View>
+
+          <button onClick={onEnable}>Enable daily reminders</button>
 
           {/* Love languages */}
           <View style={styles.card}>

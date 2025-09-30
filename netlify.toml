@@ -1,0 +1,7 @@
+[functions]
+  node_bundler = "esbuild"
+
+# Expose your scheduled sender (runs daily at 15:00 UTC ≈ 8am PT during DST)
+[[functions]]
+  name = "send-daily"
+  schedule = "0 15 * * *"

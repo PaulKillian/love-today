@@ -10,12 +10,13 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "build:web": "npx expo export --platform web --output-dir dist",
-  "postbuild:web": "npx -y cpy-cli \"public/**\" dist/ --parents",
-  "vercel-build": "npm run build:web && npm run postbuild:web"
+    "postbuild:web": "npx -y cpy-cli \"public/**\" dist/ --parents",
+    "vercel-build": "npm run build:web && npm run postbuild:web"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
     "@expo/vector-icons": "^15.0.2",
+    "@netlify/functions": "^4.2.6",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^7.4.0",
     "@react-navigation/elements": "^2.6.3",
