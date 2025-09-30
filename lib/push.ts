@@ -9,7 +9,10 @@ export async function enablePush() {
   const perm = await Notification.requestPermission();
   if (perm !== "granted") throw new Error("Permission denied");
 
-  const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY; // expose via Vite/Next public env
+  // ✅ Expo web: use EXPO_PUBLIC_* via process.env
+  const vapidPublicKey = (process.env.EXPO_PUBLIC_VAPID_PUBLIC_KEY as string) || "";
+  if (!vapidPublicKey) throw new Error("Missing EXPO_PUBLIC_VAPID_PUBLIC_KEY");
+
   const sub = await reg.pushManager.subscribe({
     userVisibleOnly: true,
     applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
@@ -22,8 +25,8 @@ export async function enablePush() {
   });
 }
 
-// helper
-function urlBase64ToUint8Array(base64) {
+// helper stays the same
+function urlBase64ToUint8Array(base64: string) {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
   const b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
   const raw = atob(b64);
