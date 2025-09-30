@@ -1,25 +1,24 @@
-# ---------- Build & publish ----------
+# netlify.toml (root)
+
 [build]
-  command = "npm ci && npm run build:web && cp public/sw.js dist/sw.js"
-  publish = "dist"
+  command   = "npm ci && npm run build:web && cp public/sw.js dist/sw.js"
+  publish   = "dist"
   functions = "netlify/functions"
 
-# ---------- Functions bundling ----------
 [functions]
   node_bundler = "esbuild"
 
-# Daily push job (UTC). Change as needed.
-[[functions]]
-  name = "send-daily"
-  schedule = "0 15 * * *"
+# ✅ schedule a function named "send-daily"
+[functions."send-daily"]
+  schedule = "0 15 * * *"   # daily 15:00 UTC
 
-# ---------- SPA routing (Expo export is a single-page app) ----------
+# SPA routing for Expo export
 [[redirects]]
   from = "/*"
-  to = "/index.html"
+  to   = "/index.html"
   status = 200
 
-# ---------- Service worker headers ----------
+# SW headers
 [[headers]]
   for = "/sw.js"
   [headers.values]
