@@ -1,7 +1,27 @@
+# ---------- Build & publish ----------
+[build]
+  command = "npm ci && npm run build:web && cp public/sw.js dist/sw.js"
+  publish = "dist"
+  functions = "netlify/functions"
+
+# ---------- Functions bundling ----------
 [functions]
   node_bundler = "esbuild"
 
-# Expose your scheduled sender (runs daily at 15:00 UTC ≈ 8am PT during DST)
+# Daily push job (UTC). Change as needed.
 [[functions]]
   name = "send-daily"
   schedule = "0 15 * * *"
+
+# ---------- SPA routing (Expo export is a single-page app) ----------
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# ---------- Service worker headers ----------
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Service-Worker-Allowed = "/"
+    Cache-Control = "no-cache"
