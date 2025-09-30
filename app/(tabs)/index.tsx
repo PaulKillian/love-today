@@ -28,7 +28,7 @@ import { Idea, Prefs, Recipient } from "../../types";
 // web push: import dynamically so native builds don't choke on /src/push
 async function enableWebPush() {
   if (Platform.OS !== "web") return "Available on web only";
-  const mod = await import("../../src/push"); // ensure this file exists
+  const mod = await import("../../lib/push"); // ensure this file exists
   await mod.enablePush();
   return "Enabled! You’ll get daily web notifications.";
 }
