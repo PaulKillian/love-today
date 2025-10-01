@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+﻿import { Ionicons } from "@expo/vector-icons";
 import dayjs from "dayjs";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
@@ -28,9 +28,9 @@ import { Idea, Prefs, Recipient } from "../../types";
 // web push: import dynamically so native builds don't choke on /src/push
 async function enableWebPush() {
   if (Platform.OS !== "web") return "Available on web only";
-  const mod = await import("../../lib/push"); // ensure this file exists
+  const mod = await import("../../lib/push");
   await mod.enablePush();
-  return "Enabled! You’ll get daily web notifications.";
+  return "Enabled! You'll get daily web notifications.";
 }
 
 export default function Today() {
@@ -43,7 +43,6 @@ export default function Today() {
   const [streakCurrent, setStreakCurrent] = useState<number>(0);
   const [status, setStatus] = useState<string>("");
 
-  // Initial load
   useEffect(() => {
     (async () => {
       await ensureNotiPermissions();
@@ -62,7 +61,6 @@ export default function Today() {
       }
       setPrefs(p);
 
-      // Native: schedule local daily reminder at chosen time
       if (Platform.OS !== "web" && p.remindAt) {
         const [h, m] = p.remindAt.split(":").map(Number);
         await scheduleDailyLocal(h, m);
@@ -75,10 +73,9 @@ export default function Today() {
     })();
   }, []);
 
-  // Re-pick idea when recipient/kid changes
   useEffect(() => {
     if (prefs) setIdea(pickIdea(prefs, recipient, kidId));
-  }, [recipient, kidId]);
+  }, [recipient, kidId, prefs]);
 
   const refresh = async () => {
     if (!prefs) return;
@@ -88,13 +85,12 @@ export default function Today() {
   const markDone = async () => {
     if (!idea) return;
     await updateHistory(idea.id);
-    const s = await tickStreak(); // update streak
+    const s = await tickStreak();
     setStreakCurrent(s.current);
     await refresh();
-    Alert.alert("Nice!", "Logged for today. Streak updated 🔥");
+    Alert.alert("Nice!", "Logged for today. Streak updated!");
   };
 
-  /** Save picked/taken photo as a Moment */
   const savePickedMoment = async (uri: string) => {
     if (!prefs || !idea) return;
     const text = renderIdeaText(idea, prefs, { kidId });
@@ -108,7 +104,6 @@ export default function Today() {
     Alert.alert("Saved", "Added to your Family Moments.");
   };
 
-  /** Take a new photo */
   const takePhoto = async () => {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (perm.status !== "granted") {
@@ -119,7 +114,6 @@ export default function Today() {
     if (!result.canceled) await savePickedMoment(result.assets[0].uri);
   };
 
-  /** Choose from library */
   const chooseFromLibrary = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (perm.status !== "granted") {
@@ -135,10 +129,18 @@ export default function Today() {
 
   const kids = prefs?.profiles?.kids ?? [];
   const remindAt = useMemo(() => prefs?.remindAt ?? "08:00", [prefs]);
+  const segmentItems = useMemo(
+    () => [
+      { label: "For Spouse", value: "spouse" as Recipient, icon: "heart-outline" as const },
+      { label: "For Children", value: "kid" as Recipient, icon: "sparkles-outline" as const },
+      { label: "For Family", value: "family" as Recipient, icon: "people-outline" as const },
+    ],
+    []
+  );
 
   const onEnableWebPush = async () => {
     try {
-      setStatus("Enabling web notifications…");
+      setStatus("Enabling web notifications...");
       const msg = await enableWebPush();
       setStatus(msg);
     } catch (e: any) {
@@ -146,13 +148,19 @@ export default function Today() {
     }
   };
 
-  // Render loading
   if (!prefs || !idea) {
     return (
-      <LinearGradient colors={["#0b0b12", "#131326"]} style={{ flex: 1 }}>
+      <LinearGradient colors={["#05070f", "#09122a", "#101b34"]} style={{ flex: 1 }}>
         <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
-          <View style={{ width: "100%", maxWidth: 1200, alignSelf: "center", paddingHorizontal: bp.containerPad, paddingTop: 20 }}>
-            <Text style={{ color: "#fff", fontSize: 18 }}>Loading…</Text>
+          <View
+            style={{
+              flex: 1,
+              alignItems: "center",
+              justifyContent: "center",
+              paddingHorizontal: 24,
+            }}
+          >
+            <Text style={{ color: "#cbd5f5", fontSize: 16 }}>Warming up today's idea...</Text>
           </View>
         </SafeAreaView>
       </LinearGradient>
@@ -160,116 +168,147 @@ export default function Today() {
   }
 
   return (
-    <LinearGradient
-      colors={["#0b0b12", "#0e0e18", "#10101b"]}
-      style={{ flex: 1 }}
-    >
+    <LinearGradient colors={["#05070f", "#0a1326", "#111f3a"]} style={{ flex: 1 }}>
       <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{
             width: "100%",
-            maxWidth: 1160,
+            maxWidth: 1180,
             alignSelf: "center",
             paddingHorizontal: bp.containerPad,
-            paddingTop: 14,
-            paddingBottom: 56,
-            rowGap: bp.gap + 6,
+            paddingTop: 20,
+            paddingBottom: 64,
+            rowGap: bp.gap + 12,
           }}
           keyboardShouldPersistTaps="handled"
         >
-          {/* NAV / HEADER */}
           <View style={styles.nav}>
             <View style={styles.brand}>
-              <View style={styles.brandLogo}>
-                <Text style={{ color: "#fff" }}>❤</Text>
+              <LinearGradient
+                colors={["#7cf5ff", "#58a6ff"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.brandBadge}
+              >
+                <Ionicons name="heart" size={18} color="#050a1b" />
+              </LinearGradient>
+              <View>
+                <Text style={styles.brandText}>Love Today</Text>
+                <Text style={styles.brandSub}>Little acts, lasting joy</Text>
               </View>
-              <Text style={styles.brandText}>Love Today</Text>
             </View>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              {/* Streak */}
+
+            <View style={styles.navRight}>
               <View style={styles.streakBadge}>
-                <Text style={styles.streakFlame}>🔥</Text>
-                <Text style={styles.streakText}>{streakCurrent}</Text>
+                <Ionicons name="flame" size={16} color="#ffb347" />
+                <Text style={styles.streakCount}>{streakCurrent}</Text>
+                <Text style={styles.streakLabel}>days</Text>
               </View>
-              {/* Menu icon */}
               <Pressable style={styles.iconBtn}>
-                <Ionicons name="menu" size={20} color="#ffffff" />
+                <Ionicons name="person-circle-outline" size={22} color="#c7d2ff" />
               </Pressable>
             </View>
           </View>
 
-          {/* HERO CARD */}
-          <View style={[styles.heroCard, { borderRadius: bp.radius + 4 }]}>
-            <View style={{ flex: 1, gap: 8 }}>
-              <Text style={styles.heroKicker}>Daily nudge</Text>
-              <Text style={[styles.heroTitle, { fontSize: bp.titleSize }]}>
-                Small acts, big heart.
+          <LinearGradient
+            colors={["rgba(124,245,255,0.28)", "rgba(99,102,241,0.2)", "rgba(10,14,32,0.9)"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[
+              styles.hero,
+              {
+                borderRadius: bp.radius + 8,
+                flexDirection: bp.isMobile ? "column" : "row",
+              },
+            ]}
+          >
+            <View style={styles.heroContent}>
+              <View style={styles.heroPill}>
+                <View style={styles.heroDot} />
+                <Text style={styles.heroPillText}>Daily nudge</Text>
+              </View>
+              <Text style={[styles.heroTitle, { fontSize: bp.titleSize + 4 }]}>
+                Make space for everyday love.
               </Text>
-              <Text style={styles.heroSub}>
-                Get one practical idea each day. Log it. Build a streak.
+              <Text style={styles.heroSubtitle}>
+                Fresh prompts curated for your people, gently nudging you to connect and celebrate what matters.
               </Text>
 
-              <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap", marginTop: 6 }}>
-                {Platform.OS === "web" ? (
-                  <Pressable onPress={onEnableWebPush} style={[styles.ctaSolid, styles.ctaGlow]}>
-                    <Ionicons name="notifications" size={16} color="#0b0b12" />
-                    <Text style={styles.ctaSolidText}>Enable web notifications</Text>
-                  </Pressable>
-                ) : (
-                  <View style={[styles.ctaMuted]}>
-                    <Ionicons name="notifications" size={16} color="#9ca3af" />
-                    <Text style={styles.ctaMutedText}>Daily local reminders at {remindAt}</Text>
-                  </View>
-                )}
+              <View style={styles.heroMeta}>
+                <View style={styles.metaCard}>
+                  <Ionicons name="sparkles-outline" size={16} color="#a6f6ff" />
+                  <Text style={styles.metaLabel}>Today's vibe</Text>
+                  <Text style={styles.metaValue}>{dayjs().format("MMM D")}</Text>
+                </View>
+                <View style={styles.metaCard}>
+                  <Ionicons name="time-outline" size={16} color="#a6f6ff" />
+                  <Text style={styles.metaLabel}>Reminder</Text>
+                  <Text style={styles.metaValue}>{remindAt}</Text>
+                </View>
               </View>
+
+              {Platform.OS === "web" ? (
+                <Pressable onPress={onEnableWebPush} style={[styles.heroAction, styles.heroActionPrimary]}>
+                  <Ionicons name="notifications-outline" size={18} color="#050b18" />
+                  <Text style={styles.heroActionText}>Enable web notifications</Text>
+                </Pressable>
+              ) : (
+                <View style={[styles.heroAction, styles.heroActionGhost]}>
+                  <Ionicons name="notifications-outline" size={18} color="#7f8ab8" />
+                  <Text style={styles.heroActionGhostText}>Daily reminder at {remindAt}</Text>
+                </View>
+              )}
 
               {status ? <Text style={styles.status}>{status}</Text> : null}
             </View>
 
             <View style={styles.heroPreview}>
-              <View style={styles.phoneShell}>
-                <View style={styles.phoneTop} />
-                <View style={styles.phoneInner}>
-                  <Text style={styles.previewLabel}>Today</Text>
-                  <Text style={styles.previewIdea}>
-                    Send a kind text to someone you haven’t checked on in a while.
-                  </Text>
+              <View style={styles.previewOrb} />
+              <View style={styles.previewCard}>
+                <View style={styles.previewHeader}>
+                  <View style={styles.previewBadge}>
+                    <View style={styles.previewDot} />
+                    <Text style={styles.previewDay}>Today</Text>
+                  </View>
+                  <Ionicons name="checkmark-circle" size={18} color="#4ade80" />
+                </View>
+                <Text style={styles.previewCopy}>
+                  Send a kind text to someone you haven't checked on in a while.
+                </Text>
+                <View style={styles.previewFooter}>
+                  <Ionicons name="timer-outline" size={14} color="#8ba2d6" />
+                  <Text style={styles.previewFooterText}>~5 mins / meaningful</Text>
                 </View>
               </View>
             </View>
-          </View>
+          </LinearGradient>
 
-          {/* SEGMENTS */}
           <View
             style={[
               styles.segmentWrap,
-              { flexDirection: bp.isMobile ? "column" : "row", gap: bp.gap },
+              {
+                flexDirection: bp.isMobile ? "column" : "row",
+              },
             ]}
           >
-            <Segment
-              label="For Spouse"
-              active={recipient === "spouse"}
-              onPress={() => setRecipient("spouse")}
-              style={{ flex: bp.isMobile ? 0 : 1, width: bp.isMobile ? "100%" : undefined }}
-            />
-            <Segment
-              label="For Children"
-              active={recipient === "kid"}
-              onPress={() => setRecipient("kid")}
-              style={{ flex: bp.isMobile ? 0 : 1, width: bp.isMobile ? "100%" : undefined }}
-            />
-            <Segment
-              label="For Family"
-              active={recipient === "family"}
-              onPress={() => setRecipient("family")}
-              style={{ flex: bp.isMobile ? 0 : 1, width: bp.isMobile ? "100%" : undefined }}
-            />
+            {segmentItems.map((item) => (
+              <Segment
+                key={item.value}
+                label={item.label}
+                icon={item.icon}
+                active={recipient === item.value}
+                onPress={() => setRecipient(item.value)}
+                style={{
+                  flex: bp.isMobile ? undefined : 1,
+                  width: bp.isMobile ? "100%" : undefined,
+                }}
+              />
+            ))}
           </View>
 
-          {/* KID SELECTOR */}
           {recipient === "kid" && kids.length > 0 && (
-            <View style={{ flexDirection: "row", gap: 8, marginTop: -4, marginBottom: 6, flexWrap: "wrap" }}>
+            <View style={styles.kidRow}>
               {kids.map((k) => (
                 <Pressable
                   key={k.id}
@@ -282,64 +321,108 @@ export default function Today() {
             </View>
           )}
 
-          {/* IMAGE GRID */}
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: bp.gap }}>
+          <View style={[styles.glassRow, { gap: bp.gap }]}>
             <GlassCard
               title="For Spouse"
+              subtitle="Intentional connection prompts"
               image={require("../../assets/ui/spouse.png")}
               widthPct={bp.cols === 3 ? "32%" : bp.cols === 2 ? "48%" : "100%"}
             />
             <GlassCard
               title="For Children"
+              subtitle="Playful ideas that build trust"
               image={require("../../assets/ui/kids.png")}
               widthPct={bp.cols === 3 ? "32%" : bp.cols === 2 ? "48%" : "100%"}
             />
             <GlassCard
               title="For Family"
+              subtitle="Moments to celebrate your people"
               image={require("../../assets/ui/family.png")}
               widthPct={bp.cols === 3 ? "32%" : bp.cols === 2 ? "48%" : "100%"}
             />
           </View>
 
-          {/* TODAY CARD */}
-          <View style={[styles.todayCard, { borderRadius: bp.radius }]}>
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-              <Text style={styles.todayLabel}>Today’s Idea • {dayjs().format("MMM D")}</Text>
-              {/* (Optional) time chip – shows remindAt */}
-              <View style={styles.timeChip}>
-                <Ionicons name="time-outline" size={12} color="#6b5a9d" />
-                <Text style={styles.timeChipText}>{remindAt}</Text>
+          <View style={[styles.todayCard, { borderRadius: bp.radius + 4 }]}>
+            <View style={styles.todayHeader}>
+              <View style={styles.todayBadge}>
+                <Ionicons name="sparkles" size={14} color="#0f172a" />
+                <Text style={styles.todayBadgeText}>Today's idea</Text>
               </View>
+              <Text style={styles.todayDate}>{dayjs().format("MMM D")}</Text>
             </View>
 
-            <Text style={[styles.todayText, { fontSize: bp.bodySize + 2 }]}>
+            <Text style={[styles.todayIdea, { fontSize: bp.bodySize + 4 }]}>
               {renderIdeaText(idea, prefs, { kidId })}
             </Text>
 
             {prefs.faithMode && idea.faith && (
-              <Text style={styles.verse}>
-                {idea.faith.verse} — {idea.faith.ref}
-              </Text>
+              <View style={styles.verseCard}>
+                <Ionicons name="book-outline" size={16} color="#34d399" />
+                <View>
+                  <Text style={styles.verseText}>{idea.faith.verse}</Text>
+                  <Text style={styles.verseRef}>{idea.faith.ref}</Text>
+                </View>
+              </View>
             )}
 
-            <View style={[styles.row, { flexWrap: "wrap" }]}>
-              <Pressable style={[styles.cta, { backgroundColor: "#22c55e" }]} onPress={markDone}>
-                <Text style={styles.ctaTextDark}>Done</Text>
+            <View
+              style={[
+                styles.actionGrid,
+                {
+                  flexDirection: bp.isMobile ? "column" : "row",
+                  justifyContent: bp.isMobile ? "flex-start" : "space-between",
+                },
+              ]}
+            >
+              <Pressable
+                style={[
+                  styles.actionButton,
+                  styles.actionPrimary,
+                  bp.isMobile ? styles.actionButtonFull : undefined,
+                ]}
+                onPress={markDone}
+              >
+                <Ionicons name="checkmark" size={18} color="#04111d" />
+                <Text style={styles.actionPrimaryText}>Mark done</Text>
               </Pressable>
-              <Pressable style={[styles.cta, { backgroundColor: "#eab308" }]} onPress={refresh}>
-                <Text style={styles.ctaTextDark}>Swap</Text>
+              <Pressable
+                style={[
+                  styles.actionButton,
+                  styles.actionSecondary,
+                  bp.isMobile ? styles.actionButtonFull : undefined,
+                ]}
+                onPress={refresh}
+              >
+                <Ionicons name="shuffle" size={18} color="#8ba2d6" />
+                <Text style={styles.actionSecondaryText}>Swap idea</Text>
               </Pressable>
-              <Pressable style={[styles.cta, { backgroundColor: "#60a5fa" }]} onPress={takePhoto}>
-                <Text style={styles.ctaTextDark}>Take Photo</Text>
+              <Pressable
+                style={[
+                  styles.actionButton,
+                  styles.actionOutline,
+                  bp.isMobile ? styles.actionButtonFull : undefined,
+                ]}
+                onPress={takePhoto}
+              >
+                <Ionicons name="camera-outline" size={18} color="#9aa9d6" />
+                <Text style={styles.actionOutlineText}>Take photo</Text>
               </Pressable>
-              <Pressable style={[styles.cta, { backgroundColor: "#a78bfa" }]} onPress={chooseFromLibrary}>
-                <Text style={styles.ctaTextDark}>Choose Photo</Text>
+              <Pressable
+                style={[
+                  styles.actionButton,
+                  styles.actionOutline,
+                  bp.isMobile ? styles.actionButtonFull : undefined,
+                ]}
+                onPress={chooseFromLibrary}
+              >
+                <Ionicons name="images-outline" size={18} color="#9aa9d6" />
+                <Text style={styles.actionOutlineText}>Choose photo</Text>
               </Pressable>
             </View>
 
             {Platform.OS === "web" && (
-              <Text style={{ color: "#8b8ea3", marginTop: 8 }}>
-                Tip: On iPhone, install to Home Screen to receive web push.
+              <Text style={styles.tipText}>
+                Tip: On iPhone, install to Home Screen to receive web push notifications.
               </Text>
             )}
           </View>
@@ -349,32 +432,37 @@ export default function Today() {
   );
 }
 
-/* ---------- Small UI components ---------- */
-
 function Segment({
   label,
+  icon,
   active,
   onPress,
   style,
 }: {
   label: string;
+  icon: React.ComponentProps<typeof Ionicons>["name"];
   active: boolean;
   onPress: () => void;
   style?: any;
 }) {
   return (
     <Pressable onPress={onPress} style={[styles.segment, active && styles.segmentActive, style]}>
-      <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
+      <View style={[styles.segmentInner, active && styles.segmentInnerActive]}>
+        <Ionicons name={icon} size={16} color={active ? "#050b18" : "#9aa9d6"} />
+        <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
+      </View>
     </Pressable>
   );
 }
 
 function GlassCard({
   title,
+  subtitle,
   image,
   widthPct,
 }: {
   title: string;
+  subtitle: string;
   image: any;
   widthPct: string;
 }) {
@@ -382,202 +470,278 @@ function GlassCard({
   const imgH = Math.max(120, Math.min(260, Math.floor(height * 0.2)));
 
   return (
-    <View style={[styles.glassCard, { width: widthPct }]}>
-      <Image
-        source={image}
-        style={{ width: "100%", height: imgH, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.06)" }}
-        resizeMode="cover"
-      />
-      <Text numberOfLines={1} style={styles.glassTitle}>
-        {title}
-      </Text>
-    </View>
+    <LinearGradient
+      colors={["rgba(255,255,255,0.08)", "rgba(94,106,255,0.1)"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={[styles.glassCard, { width: widthPct }]}
+    >
+      <Image source={image} style={[styles.glassImage, { height: imgH }]} resizeMode="cover" />
+      <View>
+        <Text numberOfLines={1} style={styles.glassTitle}>
+          {title}
+        </Text>
+        <Text numberOfLines={2} style={styles.glassSubtitle}>
+          {subtitle}
+        </Text>
+      </View>
+    </LinearGradient>
   );
 }
-
-/* ---------- Styles ---------- */
 
 const styles = StyleSheet.create({
   nav: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    borderRadius: 16,
-    padding: 10,
-    backgroundColor: "rgba(255,255,255,0.04)",
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: 24,
+    backgroundColor: "rgba(13,18,35,0.7)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+    borderColor: "rgba(120,145,255,0.18)",
   },
-  brand: { flexDirection: "row", alignItems: "center", gap: 8 },
-  brandLogo: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
+  brand: { flexDirection: "row", alignItems: "center", gap: 12 },
+  brandBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.12)",
   },
-  brandText: { color: "#fff", fontWeight: "800", letterSpacing: 0.3 },
-
+  brandText: { color: "#f8fbff", fontWeight: "800", fontSize: 16, letterSpacing: 0.4 },
+  brandSub: { color: "#97a2c7", fontSize: 12 },
+  navRight: { flexDirection: "row", alignItems: "center", gap: 12 },
   iconBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(15,24,44,0.85)",
+    borderWidth: 1,
+    borderColor: "rgba(129,140,248,0.25)",
   },
-
   streakBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    backgroundColor: "rgba(255,255,255,0.10)",
-    paddingHorizontal: 10,
-    height: 30,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
-  },
-  streakFlame: { fontSize: 14, color: "#fff" },
-  streakText: { color: "#fff", fontWeight: "800" },
-
-  heroCard: {
-    padding: 16,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    flexDirection: "row",
-    gap: 14,
-  },
-  heroKicker: { color: "#cbd5e1", fontWeight: "700", letterSpacing: 0.3, fontSize: 12 },
-  heroTitle: { color: "#fff", fontWeight: "800" },
-  heroSub: { color: "#aeb3c7" },
-
-  heroPreview: { minWidth: 220, alignItems: "center", justifyContent: "center" },
-  phoneShell: {
-    width: 220,
-    borderRadius: 22,
-    backgroundColor: "#06060a",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.09)",
-    padding: 10,
-  },
-  phoneTop: {
-    height: 10,
-    borderRadius: 6,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    marginBottom: 8,
-  },
-  phoneInner: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(255,255,255,0.03)",
-    padding: 12,
     gap: 6,
-  },
-  previewLabel: { color: "#a3a8c2", fontSize: 12, fontWeight: "700" },
-  previewIdea: { color: "#fff", fontWeight: "700" },
-
-  segmentWrap: {},
-  segment: {
-    paddingVertical: 10,
-    borderRadius: 16,
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-  },
-  segmentActive: { backgroundColor: "rgba(255,255,255,0.14)" },
-  segmentText: { color: "#e5e7eb", fontWeight: "700" },
-  segmentTextActive: { color: "#fff" },
-
-  kidPill: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.10)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
-  },
-  kidPillActive: { backgroundColor: "rgba(255,255,255,0.24)" },
-  kidPillText: { color: "#e5e7eb", fontWeight: "700" },
-  kidPillTextActive: { color: "#fff" },
-
-  glassCard: {
-    borderRadius: 18,
-    padding: 10,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-  },
-  glassTitle: { color: "#e5e7eb", fontWeight: "700", marginTop: 8 },
-
-  todayCard: {
-    padding: 16,
-    backgroundColor: "rgba(255,255,255,0.98)",
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.06)",
-  },
-  todayLabel: { color: "#6b5a9d", fontWeight: "700" },
-  todayText: { color: "#101018", fontWeight: "800", marginTop: 6, marginBottom: 8 },
-  verse: { color: "#2f855a", marginBottom: 12 },
-
-  timeChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    height: 26,
-    borderRadius: 999,
-    backgroundColor: "rgba(107,90,157,0.10)",
-  },
-  timeChipText: { color: "#6b5a9d", fontWeight: "700", fontSize: 12 },
-
-  row: { flexDirection: "row", gap: 10 },
-  cta: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 14,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  ctaTextDark: { color: "#000", fontWeight: "800" },
-
-  ctaSolid: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 14,
-    backgroundColor: "#7cf5ff",
+    height: 40,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,183,77,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(255,183,77,0.3)",
   },
-  ctaGlow: {
-    shadowColor: "#00e0ff",
+  streakCount: { color: "#ffe28a", fontWeight: "800", fontSize: 16 },
+  streakLabel: { color: "#d7c193", fontSize: 12, fontWeight: "600", letterSpacing: 0.6 },
+
+  hero: {
+    borderWidth: 1,
+    borderColor: "rgba(118,132,255,0.28)",
+    overflow: "hidden",
+    padding: 24,
+    gap: 24,
+  },
+  heroContent: { flex: 1, gap: 14 },
+  heroPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    gap: 8,
+    backgroundColor: "rgba(8,13,28,0.85)",
+    borderWidth: 1,
+    borderColor: "rgba(118,132,255,0.28)",
+  },
+  heroDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#7cf5ff" },
+  heroPillText: { color: "#9be8ff", fontWeight: "700", fontSize: 12, letterSpacing: 0.6 },
+  heroTitle: { color: "#f8fbff", fontWeight: "800", lineHeight: 32 },
+  heroSubtitle: { color: "#b2bddf", fontSize: 14, lineHeight: 20 },
+  heroMeta: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  metaCard: {
+    minWidth: 120,
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    backgroundColor: "rgba(10,18,36,0.68)",
+    borderWidth: 1,
+    borderColor: "rgba(118,132,255,0.28)",
+    gap: 4,
+  },
+  metaLabel: { color: "#90a2d8", fontSize: 12, fontWeight: "600", letterSpacing: 0.4 },
+  metaValue: { color: "#e6f2ff", fontWeight: "700", fontSize: 16 },
+  heroAction: {
+    marginTop: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+  },
+  heroActionPrimary: {
+    backgroundColor: "#7cf5ff",
     ...(Platform.OS === "android"
-      ? { elevation: 10 }
+      ? { elevation: 6 }
       : {
+          shadowColor: "#7cf5ff",
           shadowOpacity: 0.35,
-          shadowRadius: 20,
+          shadowRadius: 18,
           shadowOffset: { width: 0, height: 10 },
         }),
   },
-  ctaSolidText: { color: "#0b0b12", fontWeight: "800" },
+  heroActionText: { color: "#050b18", fontWeight: "700" },
+  heroActionGhost: {
+    backgroundColor: "rgba(15,24,44,0.85)",
+    borderWidth: 1,
+    borderColor: "rgba(124,133,172,0.4)",
+  },
+  heroActionGhostText: { color: "#9aa9d6", fontWeight: "700" },
+  heroPreview: {
+    flexBasis: 240,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+    paddingVertical: 12,
+  },
+  previewOrb: {
+    position: "absolute",
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: "rgba(124,245,255,0.2)",
+    opacity: 0.7,
+  },
+  previewCard: {
+    width: 220,
+    borderRadius: 20,
+    padding: 18,
+    backgroundColor: "rgba(9,15,28,0.92)",
+    borderWidth: 1,
+    borderColor: "rgba(128,149,255,0.28)",
+    gap: 12,
+  },
+  previewHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  previewBadge: { flexDirection: "row", alignItems: "center", gap: 8 },
+  previewDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#7cf5ff" },
+  previewDay: { color: "#d9e7ff", fontWeight: "700", fontSize: 12, letterSpacing: 0.4 },
+  previewCopy: { color: "#f5f7ff", fontWeight: "600", lineHeight: 20 },
+  previewFooter: { flexDirection: "row", alignItems: "center", gap: 6 },
+  previewFooterText: { color: "#8ba2d6", fontSize: 12, fontWeight: "600" },
 
-  ctaMuted: {
+  segmentWrap: { gap: 12 },
+  segment: {
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(121,134,190,0.28)",
+    backgroundColor: "rgba(11,18,32,0.7)",
+    padding: 2,
+  },
+  segmentActive: { borderColor: "#7cf5ff", backgroundColor: "rgba(124,245,255,0.18)" },
+  segmentInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 18,
+  },
+  segmentInnerActive: { backgroundColor: "#7cf5ff" },
+  segmentText: { color: "#9aa9d6", fontWeight: "700" },
+  segmentTextActive: { color: "#050b18" },
+
+  kidRow: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: -4 },
+  kidPill: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(121,145,255,0.3)",
+    backgroundColor: "rgba(13,19,35,0.75)",
+  },
+  kidPillActive: { borderColor: "#7cf5ff", backgroundColor: "rgba(124,245,255,0.24)" },
+  kidPillText: { color: "#aebaea", fontWeight: "700" },
+  kidPillTextActive: { color: "#050b18" },
+
+  glassRow: { flexDirection: "row", flexWrap: "wrap" },
+  glassCard: {
+    borderRadius: 22,
+    padding: 16,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "rgba(123,147,255,0.28)",
+  },
+  glassImage: { width: "100%", borderRadius: 16, backgroundColor: "rgba(13,20,40,0.65)" },
+  glassTitle: { color: "#f2f6ff", fontWeight: "700", fontSize: 16 },
+  glassSubtitle: { color: "#8fa2d7", fontSize: 12, lineHeight: 16 },
+
+  todayCard: {
+    padding: 24,
+    backgroundColor: "rgba(18,24,42,0.8)",
+    borderWidth: 1,
+    borderColor: "rgba(128,149,255,0.28)",
+    gap: 18,
+  },
+  todayHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  todayBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: "rgba(124,245,255,0.2)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
+    borderColor: "rgba(124,245,255,0.42)",
   },
-  ctaMutedText: { color: "#9ca3af", fontWeight: "800" },
+  todayBadgeText: { color: "#0f172a", fontWeight: "700", fontSize: 12, letterSpacing: 0.4 },
+  todayDate: { color: "#a0b2e6", fontWeight: "600" },
+  todayIdea: { color: "#f8fbff", fontWeight: "700", lineHeight: 26 },
+  verseCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: "rgba(20,34,46,0.9)",
+    borderWidth: 1,
+    borderColor: "rgba(86,225,157,0.3)",
+  },
+  verseText: { color: "#dcfce7", fontWeight: "700" },
+  verseRef: { color: "#a7f3d0", fontSize: 12 },
 
-  status: { color: "#a3a8c2", marginTop: 6, fontSize: 12 },
+  actionGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  actionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: 16,
+    width: "48%",
+  },
+  actionButtonFull: { width: "100%" },
+  actionPrimary: { backgroundColor: "#4ade80" },
+  actionPrimaryText: { color: "#04111d", fontWeight: "800" },
+  actionSecondary: {
+    backgroundColor: "rgba(79,70,229,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(129,140,248,0.45)",
+  },
+  actionSecondaryText: { color: "#9aa9d6", fontWeight: "700" },
+  actionOutline: {
+    borderWidth: 1,
+    borderColor: "rgba(129,140,248,0.4)",
+    backgroundColor: "rgba(13,19,35,0.82)",
+  },
+  actionOutlineText: { color: "#9aa9d6", fontWeight: "700" },
+
+  tipText: { color: "#8ba2d6", fontSize: 12 },
+  status: { marginTop: 8, color: "#9aa9d6", fontSize: 12 },
 });
