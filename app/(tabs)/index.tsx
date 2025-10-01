@@ -39,6 +39,7 @@ export default function Today() {
   const [recipient, setRecipient] = useState<Recipient>("spouse");
   const [kidId, setKidId] = useState<string | undefined>(undefined);
   const [streakCurrent, setStreakCurrent] = useState<number>(0);
+  const [ideaCompleted, setIdeaCompleted] = useState<boolean>(false);
   const [status, setStatus] = useState<string>("");
 
   useEffect(() => {
@@ -64,6 +65,8 @@ export default function Today() {
         await scheduleDailyLocal(h, m);
       }
 
+      setIdeaCompleted(false);
+
       setIdea(pickIdea(p, recipient, kidId));
 
       const s = await loadStreak();
@@ -72,11 +75,15 @@ export default function Today() {
   }, []);
 
   useEffect(() => {
-    if (prefs) setIdea(pickIdea(prefs, recipient, kidId));
+    if (prefs) {
+      setIdeaCompleted(false);
+      setIdea(pickIdea(prefs, recipient, kidId));
+    }
   }, [recipient, kidId, prefs]);
 
   const refresh = async () => {
     if (!prefs) return;
+    setIdeaCompleted(false);
     setIdea(pickIdea(prefs, recipient, kidId));
   };
 
@@ -85,7 +92,7 @@ export default function Today() {
     await updateHistory(idea.id);
     const s = await tickStreak();
     setStreakCurrent(s.current);
-    await refresh();
+    setIdeaCompleted(true);
     Alert.alert("Nice!", "Logged for today. Streak updated!");
   };
 
@@ -342,60 +349,75 @@ export default function Today() {
               </View>
             )}
 
-            <View
-              style={[
-                styles.actionGrid,
-                {
-                  flexDirection: bp.isMobile ? "column" : "row",
-                  justifyContent: bp.isMobile ? "flex-start" : "space-between",
-                },
-              ]}
-            >
-              <Pressable
+            {ideaCompleted ? (
+              <View
                 style={[
-                  styles.actionButton,
-                  styles.actionPrimary,
-                  bp.isMobile ? styles.actionButtonFull : undefined,
+                  styles.actionGrid,
+                  styles.actionGridDone,
+                  { width: "100%" },
                 ]}
-                onPress={markDone}
               >
-                <Ionicons name="checkmark" size={18} color="#04111d" />
-                <Text style={styles.actionPrimaryText}>Mark done</Text>
-              </Pressable>
-              <Pressable
+                <View style={styles.actionDoneBadge}>
+                  <Ionicons name="checkmark-circle" size={18} color="#4ade80" />
+                  <Text style={styles.actionDoneText}>Done</Text>
+                </View>
+              </View>
+            ) : (
+              <View
                 style={[
-                  styles.actionButton,
-                  styles.actionSecondary,
-                  bp.isMobile ? styles.actionButtonFull : undefined,
+                  styles.actionGrid,
+                  {
+                    flexDirection: bp.isMobile ? "column" : "row",
+                    justifyContent: bp.isMobile ? "flex-start" : "space-between",
+                  },
                 ]}
-                onPress={refresh}
               >
-                <Ionicons name="shuffle" size={18} color="#8ba2d6" />
-                <Text style={styles.actionSecondaryText}>Swap idea</Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.actionButton,
-                  styles.actionOutline,
-                  bp.isMobile ? styles.actionButtonFull : undefined,
-                ]}
-                onPress={takePhoto}
-              >
-                <Ionicons name="camera-outline" size={18} color="#9aa9d6" />
-                <Text style={styles.actionOutlineText}>Take photo</Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.actionButton,
-                  styles.actionOutline,
-                  bp.isMobile ? styles.actionButtonFull : undefined,
-                ]}
-                onPress={chooseFromLibrary}
-              >
-                <Ionicons name="images-outline" size={18} color="#9aa9d6" />
-                <Text style={styles.actionOutlineText}>Choose photo</Text>
-              </Pressable>
-            </View>
+                <Pressable
+                  style={[
+                    styles.actionButton,
+                    styles.actionPrimary,
+                    bp.isMobile ? styles.actionButtonFull : undefined,
+                  ]}
+                  onPress={markDone}
+                >
+                  <Ionicons name="checkmark" size={18} color="#04111d" />
+                  <Text style={styles.actionPrimaryText}>Mark done</Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.actionButton,
+                    styles.actionSecondary,
+                    bp.isMobile ? styles.actionButtonFull : undefined,
+                  ]}
+                  onPress={refresh}
+                >
+                  <Ionicons name="shuffle" size={18} color="#8ba2d6" />
+                  <Text style={styles.actionSecondaryText}>Swap idea</Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.actionButton,
+                    styles.actionOutline,
+                    bp.isMobile ? styles.actionButtonFull : undefined,
+                  ]}
+                  onPress={takePhoto}
+                >
+                  <Ionicons name="camera-outline" size={18} color="#9aa9d6" />
+                  <Text style={styles.actionOutlineText}>Take photo</Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.actionButton,
+                    styles.actionOutline,
+                    bp.isMobile ? styles.actionButtonFull : undefined,
+                  ]}
+                  onPress={chooseFromLibrary}
+                >
+                  <Ionicons name="images-outline" size={18} color="#9aa9d6" />
+                  <Text style={styles.actionOutlineText}>Choose photo</Text>
+                </Pressable>
+              </View>
+            )}
 
             {Platform.OS === "web" && (
               <Text style={styles.tipText}>
@@ -672,6 +694,19 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(13,19,35,0.82)",
   },
   actionOutlineText: { color: "#9aa9d6", fontWeight: "700" },
+  actionGridDone: { alignItems: "center", justifyContent: "center" },
+  actionDoneBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 16,
+    backgroundColor: "rgba(74,222,128,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(74,222,128,0.5)",
+  },
+  actionDoneText: { color: "#4ade80", fontWeight: "800" },
 
   tipText: { color: "#8ba2d6", fontSize: 12 },
   status: { marginTop: 8, color: "#9aa9d6", fontSize: 12 },
