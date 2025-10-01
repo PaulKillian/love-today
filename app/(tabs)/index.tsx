@@ -321,27 +321,6 @@ export default function Today() {
             </View>
           )}
 
-          <View style={[styles.glassRow, { gap: bp.gap }]}>
-            <GlassCard
-              title="For Spouse"
-              subtitle="Intentional connection prompts"
-              image={require("../../assets/ui/spouse.png")}
-              widthPct={bp.cols === 3 ? "32%" : bp.cols === 2 ? "48%" : "100%"}
-            />
-            <GlassCard
-              title="For Children"
-              subtitle="Playful ideas that build trust"
-              image={require("../../assets/ui/kids.png")}
-              widthPct={bp.cols === 3 ? "32%" : bp.cols === 2 ? "48%" : "100%"}
-            />
-            <GlassCard
-              title="For Family"
-              subtitle="Moments to celebrate your people"
-              image={require("../../assets/ui/family.png")}
-              widthPct={bp.cols === 3 ? "32%" : bp.cols === 2 ? "48%" : "100%"}
-            />
-          </View>
-
           <View style={[styles.todayCard, { borderRadius: bp.radius + 4 }]}>
             <View style={styles.todayHeader}>
               <View style={styles.todayBadge}>
