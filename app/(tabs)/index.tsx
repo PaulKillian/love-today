@@ -1,17 +1,15 @@
-﻿import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import dayjs from "dayjs";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
-  Image,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -434,40 +432,6 @@ function Segment({
   );
 }
 
-function GlassCard({
-  title,
-  subtitle,
-  image,
-  widthPct,
-}: {
-  title: string;
-  subtitle: string;
-  image: any;
-  widthPct: string;
-}) {
-  const { height } = useWindowDimensions();
-  const imgH = Math.max(120, Math.min(260, Math.floor(height * 0.2)));
-
-  return (
-    <LinearGradient
-      colors={["rgba(255,255,255,0.08)", "rgba(94,106,255,0.1)"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={[styles.glassCard, { width: widthPct }]}
-    >
-      <Image source={image} style={[styles.glassImage, { height: imgH }]} resizeMode="cover" />
-      <View>
-        <Text numberOfLines={1} style={styles.glassTitle}>
-          {title}
-        </Text>
-        <Text numberOfLines={2} style={styles.glassSubtitle}>
-          {subtitle}
-        </Text>
-      </View>
-    </LinearGradient>
-  );
-}
-
 const styles = StyleSheet.create({
   nav: {
     flexDirection: "row",
@@ -646,18 +610,6 @@ const styles = StyleSheet.create({
   kidPillActive: { borderColor: "#7cf5ff", backgroundColor: "rgba(124,245,255,0.24)" },
   kidPillText: { color: "#aebaea", fontWeight: "700" },
   kidPillTextActive: { color: "#050b18" },
-
-  glassRow: { flexDirection: "row", flexWrap: "wrap" },
-  glassCard: {
-    borderRadius: 22,
-    padding: 16,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: "rgba(123,147,255,0.28)",
-  },
-  glassImage: { width: "100%", borderRadius: 16, backgroundColor: "rgba(13,20,40,0.65)" },
-  glassTitle: { color: "#f2f6ff", fontWeight: "700", fontSize: 16 },
-  glassSubtitle: { color: "#8fa2d7", fontSize: 12, lineHeight: 16 },
 
   todayCard: {
     padding: 24,
