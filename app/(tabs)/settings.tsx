@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+﻿import { Ionicons } from "@expo/vector-icons";
 import dayjs from "dayjs";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useMemo, useState } from "react";
@@ -21,7 +21,6 @@ import { loadPrefs, savePrefs } from "../../lib/storage";
 import { ensureWebPushSubscription } from "../../lib/webpush";
 import { Prefs } from "../../types";
 
-/** For love languages multi-select */
 const LANGS = [
   { id: "words", label: "Words" },
   { id: "time", label: "Quality Time" },
@@ -33,25 +32,11 @@ const LANGS = [
 export default function Settings() {
   const bp = useBreakpoints();
   const [prefs, setPrefs] = useState<Prefs | null>(null);
+  const [status, setStatus] = useState<string>("");
 
-  // Web Push status (web only)
   const [webPushPermission, setWebPushPermission] = useState<"granted" | "denied" | "default">("default");
   const [webPushSubscribed, setWebPushSubscribed] = useState<boolean>(false);
   const showWebPushRow = Platform.OS === "web";
-  const [status, setStatus] = useState<string>("");
-
-  const onEnable = async () => {
-    try {
-      if (Platform.OS !== "web") {
-        setStatus("Push via web only. Open this site in a browser and Add to Home Screen (iOS).");
-        return;
-      }
-      await enablePush();
-      setStatus("Enabled! You’ll get daily reminders.");
-    } catch (e: any) {
-      setStatus(e?.message || String(e));
-    }
-  };
 
   useEffect(() => {
     (async () => {
@@ -61,7 +46,6 @@ export default function Settings() {
       if (Platform.OS !== "web") {
         await ensureNotiPermissions();
       } else {
-        // read current web permission and subscription state
         try {
           const perm = (Notification && Notification.permission) || "default";
           if (perm === "granted" || perm === "denied" || perm === "default") {
@@ -72,7 +56,9 @@ export default function Settings() {
             const sub = await reg?.pushManager.getSubscription();
             setWebPushSubscribed(!!sub);
           }
-        } catch {}
+        } catch (err) {
+          console.warn("web push init failed", err);
+        }
       }
     })();
   }, []);
@@ -135,7 +121,6 @@ export default function Settings() {
   const saveAll = async () => {
     if (!prefs) return;
 
-    // Normalize reminder time to HH:mm
     let remindAt = prefs.remindAt || "08:00";
     const m = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(remindAt);
     if (!m) {
@@ -145,11 +130,9 @@ export default function Settings() {
 
     await savePrefs({ ...prefs, remindAt });
 
-    // Notifications
-    if (Platform.OS === "web") {
-      try {
+    try {
+      if (Platform.OS === "web") {
         await ensureWebPushSubscription(remindAt);
-        // refresh indicators
         const perm = (Notification && Notification.permission) || "default";
         if (perm === "granted" || perm === "denied" || perm === "default") {
           setWebPushPermission(perm);
@@ -159,26 +142,44 @@ export default function Settings() {
           const sub = await reg?.pushManager.getSubscription();
           setWebPushSubscribed(!!sub);
         }
-      } catch (e: any) {
-        console.warn("web push subscribe failed", e?.message);
+      } else {
+        await ensureNotiPermissions();
+        const [h, mm] = remindAt.split(":").map(Number);
+        try {
+          await cancelAllLocal();
+        } catch {}
+        await scheduleDailyLocal(h, mm);
       }
-    } else {
-      await ensureNotiPermissions();
-      const [h, mm] = remindAt.split(":").map(Number);
-      // optional: clear + reschedule
-      try { await cancelAllLocal(); } catch {}
-      await scheduleDailyLocal(h, mm);
+      setStatus(`Settings saved at ${dayjs().format("h:mm A")}`);
+      Alert.alert("Saved", "Your preferences have been updated.");
+    } catch (err: any) {
+      setStatus(err?.message || "Failed to update notifications");
+      Alert.alert("Oops", err?.message || "Failed to update notifications.");
     }
+  };
 
-    Alert.alert("Saved", "Your preferences have been updated.");
+  const handleEnablePush = async () => {
+    if (Platform.OS !== "web") {
+      setStatus("Push notifications are available on web. Open Love Today in your browser and install to Home Screen.");
+      Alert.alert("Heads up", "Push notifications are available on web. Open Love Today in your browser and install to Home Screen.");
+      return;
+    }
+    try {
+      await enablePush();
+      setStatus("Web push enabled. You will receive daily reminders.");
+      Alert.alert("Enabled", "Web push notifications are enabled.");
+    } catch (err: any) {
+      setStatus(err?.message || "Failed to enable web push");
+      Alert.alert("Oops", err?.message || "Failed to enable web push.");
+    }
   };
 
   if (!prefs) {
     return (
-      <LinearGradient colors={["#F3D5FF", "#D0C7FF", "#BEE1FF"]} style={{ flex: 1 }}>
+      <LinearGradient colors={["#05070f", "#0a1326", "#111f3a"]} style={{ flex: 1 }}>
         <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
-          <View style={{ padding: 18 }}>
-            <Text style={{ color: "#fff", fontSize: 18 }}>Loading…</Text>
+          <View style={styles.loading}>
+            <Text style={styles.loadingText}>Loading preferences...</Text>
           </View>
         </SafeAreaView>
       </LinearGradient>
@@ -186,123 +187,152 @@ export default function Settings() {
   }
 
   return (
-    <LinearGradient colors={["#F3D5FF", "#D0C7FF", "#BEE1FF"]} style={{ flex: 1 }}>
+    <LinearGradient colors={["#05070f", "#0a1326", "#111f3a"]} style={{ flex: 1 }}>
       <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 30, paddingTop: 10 }}>
-          <Text style={styles.heading}>Settings</Text>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            width: "100%",
+            maxWidth: 1180,
+            alignSelf: "center",
+            paddingHorizontal: bp.containerPad,
+            paddingTop: 20,
+            paddingBottom: 64,
+            gap: 18,
+          }}
+        >
+          <LinearGradient
+            colors={["rgba(124,245,255,0.18)", "rgba(98,117,255,0.12)", "rgba(10,18,36,0.95)"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.hero}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.heading}>Settings</Text>
+              <Text style={styles.subheading}>Tune the prompts, budgets, and reminders that help you show up every day.</Text>
+            </View>
+            <View style={styles.reminderBadge}>
+              <Ionicons name="time-outline" size={18} color="#050b18" />
+              <Text style={styles.reminderBadgeText}>{prefs.remindAt || "--:--"}</Text>
+            </View>
+          </LinearGradient>
 
-          {/* Names */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Profiles</Text>
-
-            <Text style={styles.label}>Spouse’s name</Text>
+            <Text style={styles.label}>Spouse name</Text>
             <TextInput
               value={prefs.profiles?.spouse?.name || ""}
               onChangeText={setSpouseName}
-              placeholder="e.g., Emily"
+              placeholder="Enter a name"
               style={styles.input}
-              placeholderTextColor="#7c6ea8"
+              placeholderTextColor="#6d7aa6"
             />
 
-            <Text style={[styles.label, { marginTop: 10 }]}>Children</Text>
-            {kids.map((k) => (
-              <View key={k.id} style={styles.kidRow}>
-                <TextInput
-                  value={k.name}
-                  onChangeText={(t) => setKidName(k.id, t)}
-                  placeholder="Child’s name"
-                  style={[styles.input, { flex: 1 }]}
-                  placeholderTextColor="#7c6ea8"
-                />
-                <Pressable onPress={() => removeKid(k.id)} style={styles.iconBtn}>
-                  <Ionicons name="trash" size={16} color="#1f163a" />
-                </Pressable>
-              </View>
-            ))}
-            <Pressable onPress={addKid} style={[styles.pillBtn, { marginTop: 8 }]}>
-              <Ionicons name="add" size={16} color="#1f163a" />
-              <Text style={styles.pillText}>Add a child</Text>
-            </Pressable>
+            <View style={styles.kidHeader}>
+              <Text style={styles.label}>Children</Text>
+              <Pressable onPress={addKid} style={styles.addKidBtn}>
+                <Ionicons name="add" size={16} color="#050b18" />
+                <Text style={styles.addKidText}>Add child</Text>
+              </Pressable>
+            </View>
+
+            <View style={{ gap: 10 }}>
+              {kids.length === 0 ? (
+                <Text style={styles.muted}>No children added yet.</Text>
+              ) : (
+                kids.map((kid) => (
+                  <View key={kid.id} style={styles.kidRow}>
+                    <TextInput
+                      value={kid.name}
+                      onChangeText={(name) => setKidName(kid.id, name)}
+                      placeholder="Name"
+                      style={[styles.input, { flex: 1 }]}
+                      placeholderTextColor="#6d7aa6"
+                    />
+                    <Pressable onPress={() => removeKid(kid.id)} style={styles.removeKidBtn}>
+                      <Ionicons name="trash" size={16} color="#fca5a5" />
+                    </Pressable>
+                  </View>
+                ))
+              )}
+            </View>
           </View>
 
-          <button onClick={onEnable}>Enable daily reminders</button>
-
-          {/* Love languages */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Love Languages</Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-              {LANGS.map((l) => {
-                const active = prefs.loveLanguages?.includes(l.id as any);
+            <Text style={styles.cardTitle}>Love languages</Text>
+            <View style={styles.chipRow}>
+              {LANGS.map((lang) => {
+                const active = prefs.loveLanguages?.includes(lang.id as any);
                 return (
                   <Pressable
-                    key={l.id}
-                    onPress={() => toggleLang(l.id)}
+                    key={lang.id}
+                    onPress={() => toggleLang(lang.id)}
                     style={[styles.chip, active && styles.chipActive]}
                   >
-                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{l.label}</Text>
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{lang.label}</Text>
                   </Pressable>
                 );
               })}
             </View>
           </View>
 
-          {/* Budgets & faith */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Preferences</Text>
-
             <Text style={styles.label}>Time budget</Text>
             <TextInput
               value={prefs.timeBudget || ""}
               onChangeText={(v) => update("timeBudget", v as any)}
-              placeholder="e.g., 15min, 30min"
+              placeholder="e.g. 15min, 30min"
               style={styles.input}
-              placeholderTextColor="#7c6ea8"
+              placeholderTextColor="#6d7aa6"
             />
 
             <Text style={styles.label}>Money budget</Text>
             <TextInput
               value={prefs.moneyBudget || ""}
               onChangeText={(v) => update("moneyBudget", v as any)}
-              placeholder="e.g., budget:$, budget:$$"
+              placeholder="e.g. budget:$, budget:$$"
               style={styles.input}
-              placeholderTextColor="#7c6ea8"
+              placeholderTextColor="#6d7aa6"
             />
 
-            <View style={{ height: 10 }} />
-
-            <Pressable
-              onPress={() => update("faithMode", !prefs.faithMode as any)}
-              style={[styles.switchRow, prefs.faithMode && styles.switchOn]}
-            >
-              <View style={[styles.switchDot, prefs.faithMode && styles.switchDotOn]} />
-              <Text style={styles.switchLabel}>
-                Faith mode {prefs.faithMode ? "On" : "Off"}
+            <Pressable onPress={() => update("faithMode", !prefs.faithMode as any)} style={[styles.toggle, prefs.faithMode && styles.toggleActive]}>
+              <View style={[styles.toggleDot, prefs.faithMode && styles.toggleDotActive]} />
+              <Text style={[styles.toggleLabel, prefs.faithMode && styles.toggleLabelActive]}>
+                Faith mode {prefs.faithMode ? "on" : "off"}
               </Text>
             </Pressable>
           </View>
 
-          {/* Notifications */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Daily Reminder</Text>
+            <View style={styles.cardHeaderRow}>
+              <Text style={styles.cardTitle}>Daily reminder</Text>
+              <Pressable onPress={handleEnablePush} style={styles.smallGhostBtn}>
+                <Ionicons name="notifications-outline" size={14} color="#8ba2d6" />
+                <Text style={styles.smallGhostText}>Enable push</Text>
+              </Pressable>
+            </View>
 
             <Text style={styles.label}>Time (24h)</Text>
             <TextInput
               value={prefs.remindAt || ""}
               onChangeText={(v) => update("remindAt", v as any)}
-              placeholder="HH:mm (e.g., 08:00)"
+              placeholder="HH:mm"
               keyboardType="numbers-and-punctuation"
               style={styles.input}
-              placeholderTextColor="#7c6ea8"
+              placeholderTextColor="#6d7aa6"
             />
 
             {showWebPushRow ? (
-              <View style={{ marginTop: 10 }}>
-                <Text style={styles.label}>Web Push</Text>
+              <View style={{ gap: 10 }}>
+                <Text style={styles.label}>Web push status</Text>
                 <View style={styles.webRow}>
                   <View style={[styles.statusPill, pillStyle(webPushPermission, webPushSubscribed)]}>
                     <Text style={styles.statusText}>
                       {webPushPermission === "granted"
-                        ? webPushSubscribed ? "Subscribed ✓" : "Granted (not subscribed)"
+                        ? webPushSubscribed
+                          ? "Subscribed"
+                          : "Granted (not subscribed)"
                         : webPushPermission === "denied"
                         ? "Denied"
                         : "Not requested"}
@@ -319,42 +349,40 @@ export default function Settings() {
                         const reg = await navigator.serviceWorker.getRegistration();
                         const sub = await reg?.pushManager.getSubscription();
                         setWebPushSubscribed(!!sub);
-                        Alert.alert("Ready", "Web Push is set up!");
+                        setStatus("Web push is ready to go.");
+                        Alert.alert("Ready", "Web push is set up.");
                       } catch (e: any) {
-                        Alert.alert("Oops", e?.message ?? "Failed to set up web push.");
+                        setStatus(e?.message || "Failed to configure web push");
+                        Alert.alert("Oops", e?.message ?? "Failed to configure web push.");
                       }
                     }}
-                    style={[styles.pillBtn, { backgroundColor: "rgba(96,165,250,0.25)" }]}
+                    style={styles.webBtn}
                   >
-                    <Ionicons name="notifications" size={16} color="#1f163a" />
-                    <Text style={styles.pillText}>Enable Web Push</Text>
+                    <Ionicons name="refresh-outline" size={14} color="#050b18" />
+                    <Text style={styles.webBtnText}>Refresh status</Text>
                   </Pressable>
                 </View>
-                <Text style={styles.webHint}>
-                  iPhone/iPad: install to Home Screen to receive pushes in the background.
-                </Text>
+                <Text style={styles.tip}>iPhone or iPad: install to Home Screen to receive pushes in the background.</Text>
               </View>
             ) : (
-              <Text style={{ color: "#6b5a9d", marginTop: 8 }}>
-                Local notifications will be scheduled on your device.
-              </Text>
+              <Text style={styles.tip}>Local notifications will be scheduled on this device.</Text>
             )}
           </View>
 
-          <Pressable onPress={saveAll} style={[styles.saveBtn, { backgroundColor: "#22c55e" }]}>
-            <Text style={styles.saveText}>Save Settings</Text>
+          <Pressable onPress={saveAll} style={styles.saveBtn}>
+            <Ionicons name="save-outline" size={18} color="#050b18" />
+            <Text style={styles.saveText}>Save settings</Text>
           </Pressable>
 
-          <Text style={styles.footer}>
-            Last updated {dayjs().format("MMM D, YYYY • h:mm A")}
-          </Text>
+          <View style={styles.footerWrap}>
+            <Text style={styles.footerText}>Last updated {dayjs().format("MMM D, YYYY - h:mm A")}</Text>
+            {status ? <Text style={styles.status}>{status}</Text> : null}
+          </View>
         </ScrollView>
       </SafeAreaView>
     </LinearGradient>
   );
 }
-
-/* ---------- helpers ---------- */
 
 function pillStyle(perm: "granted" | "denied" | "default", subscribed: boolean) {
   if (perm === "granted" && subscribed) return { backgroundColor: "rgba(34,197,94,0.2)", borderColor: "rgba(34,197,94,0.4)" };
@@ -363,80 +391,151 @@ function pillStyle(perm: "granted" | "denied" | "default", subscribed: boolean) 
   return { backgroundColor: "rgba(148,163,184,0.2)", borderColor: "rgba(148,163,184,0.4)" };
 }
 
-/* ---------- styles ---------- */
-
 const styles = StyleSheet.create({
-  heading: { color: "#fff", fontSize: 28, fontWeight: "800", marginBottom: 12 },
-  card: {
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.96)",
-    padding: 14,
+  loading: { flex: 1, alignItems: "center", justifyContent: "center" },
+  loadingText: { color: "#cbd5f5", fontSize: 16 },
+  hero: {
+    borderRadius: 28,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.35)",
-    marginBottom: 12,
+    borderColor: "rgba(123,147,255,0.28)",
+    padding: 24,
+    gap: 18,
+    flexDirection: "row",
+    alignItems: "center",
   },
-  cardTitle: { color: "#1a1330", fontWeight: "800", fontSize: 18, marginBottom: 8 },
-
-  label: { color: "#6b5a9d", fontWeight: "700", marginBottom: 6, marginTop: 4 },
-  input: {
-    backgroundColor: "rgba(255,255,255,0.7)",
-    borderWidth: 1,
-    borderColor: "rgba(148,163,184,0.4)",
-    borderRadius: 12,
-    paddingHorizontal: 12,
+  heading: { color: "#f8fbff", fontSize: 26, fontWeight: "800" },
+  subheading: { color: "#aab8e5", lineHeight: 20 },
+  reminderBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
     paddingVertical: 10,
-    color: "#1a1330",
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    backgroundColor: "#7cf5ff",
   },
+  reminderBadgeText: { color: "#050b18", fontWeight: "700" },
 
-  kidRow: { flexDirection: "row", gap: 8, alignItems: "center", marginBottom: 8 },
-  iconBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    alignItems: "center", justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.06)",
+  card: {
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "rgba(123,147,255,0.24)",
+    backgroundColor: "rgba(12,20,40,0.88)",
+    padding: 22,
+    gap: 14,
   },
-
+  cardTitle: { color: "#f1f5ff", fontWeight: "800", fontSize: 18 },
+  label: { color: "#8ba2d6", fontWeight: "700", marginBottom: 6 },
+  muted: { color: "#6d7aa6", fontStyle: "italic" },
+  input: {
+    backgroundColor: "rgba(15,24,44,0.82)",
+    borderWidth: 1,
+    borderColor: "rgba(123,147,255,0.24)",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    color: "#f1f5ff",
+  },
+  kidHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  kidRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  addKidBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    backgroundColor: "#7cf5ff",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  addKidText: { color: "#050b18", fontWeight: "700" },
+  removeKidBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(239,68,68,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(239,68,68,0.3)",
+  },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   chip: {
-    paddingVertical: 8, paddingHorizontal: 12, borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.28)",
-    borderWidth: 1, borderColor: "rgba(255,255,255,0.35)",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: "rgba(14,22,40,0.8)",
+    borderWidth: 1,
+    borderColor: "rgba(123,147,255,0.22)",
   },
-  chipActive: { backgroundColor: "rgba(255,255,255,0.9)" },
-  chipText: { color: "#2b2342", fontWeight: "700" },
-  chipTextActive: { color: "#1f163a", fontWeight: "800" },
+  chipActive: { backgroundColor: "#7cf5ff", borderColor: "#7cf5ff" },
+  chipText: { color: "#8ba2d6", fontWeight: "700" },
+  chipTextActive: { color: "#050b18", fontWeight: "700" },
 
-  switchRow: {
-    flexDirection: "row", alignItems: "center", gap: 10,
-    backgroundColor: "rgba(0,0,0,0.06)", borderRadius: 999, padding: 6,
+  toggle: {
+    marginTop: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "rgba(15,24,44,0.8)",
+    borderWidth: 1,
+    borderColor: "rgba(123,147,255,0.22)",
   },
-  switchOn: { backgroundColor: "rgba(34,197,94,0.18)" },
-  switchDot: { width: 22, height: 22, borderRadius: 11, backgroundColor: "#94a3b8" },
-  switchDotOn: { backgroundColor: "#22c55e" },
-  switchLabel: { color: "#1f163a", fontWeight: "800" },
+  toggleActive: { backgroundColor: "rgba(34,197,94,0.2)", borderColor: "rgba(34,197,94,0.4)" },
+  toggleDot: { width: 20, height: 20, borderRadius: 10, backgroundColor: "#4b5c87" },
+  toggleDotActive: { backgroundColor: "#22c55e" },
+  toggleLabel: { color: "#f1f5ff", fontWeight: "700" },
+  toggleLabelActive: { color: "#0b141f" },
 
-  pillBtn: {
-    flexDirection: "row", alignItems: "center", gap: 8,
-    backgroundColor: "rgba(255,255,255,0.75)",
-    paddingVertical: 10, paddingHorizontal: 12, borderRadius: 999,
-    alignSelf: "flex-start",
+  cardHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  smallGhostBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(123,147,255,0.28)",
+    backgroundColor: "rgba(14,24,40,0.8)",
   },
-  pillText: { color: "#1f163a", fontWeight: "800" },
+  smallGhostText: { color: "#8ba2d6", fontSize: 12, fontWeight: "700" },
 
-  webRow: { flexDirection: "row", gap: 8, alignItems: "center", flexWrap: "wrap" },
+  webRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 10 },
   statusPill: {
-    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
     borderWidth: 1,
   },
-  statusText: { color: "#1f163a", fontWeight: "800" },
-  webHint: { color: "#6b5a9d", marginTop: 8 },
+  statusText: { color: "#f1f5ff", fontWeight: "700" },
+  webBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    backgroundColor: "#7cf5ff",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  webBtnText: { color: "#050b18", fontWeight: "700" },
+  tip: { color: "#6d7aa6", fontSize: 12 },
 
   saveBtn: {
-    paddingVertical: 14, borderRadius: 14, alignItems: "center",
-    ...Platform.select({
-      ios: { shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 10, shadowOffset: { width: 0, height: 6 } },
-      android: { elevation: 4 },
-    }),
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    backgroundColor: "#7cf5ff",
   },
-  saveText: { color: "#0b132b", fontWeight: "900" },
+  saveText: { color: "#050b18", fontWeight: "800" },
 
-  footer: { color: "#fff", textAlign: "center", opacity: 0.9, marginTop: 8 },
+  footerWrap: { gap: 6 },
+  footerText: { color: "#6d7aa6", fontSize: 12 },
+  status: { color: "#8ba2d6", fontSize: 12 },
 });
