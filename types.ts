@@ -28,7 +28,10 @@ export type Prefs = {
   timeBudget: "5min" | "15min" | "30min";
   moneyBudget: "budget:$" | "budget:$$";
   faithMode: boolean;
-  remindAt: string; // "08:00"
+  remindAt: string; // legacy fallback
+  remindAtWeekday?: string;
+  remindAtWeekend?: string;
+  catchUpAt?: string;
   lastShownIds: string[];
 };
 
@@ -42,3 +45,4 @@ export type Moment = {
   photoUri?: string;
   note?: string;
 };
+

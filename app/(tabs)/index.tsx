@@ -2,7 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import dayjs from "dayjs";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   Alert,
   Platform,
@@ -15,10 +16,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { addMoment } from "../../lib/moments";
-import { ensureNotiPermissions, scheduleDailyLocal } from "../../lib/notify";
+import { ensureNotiPermissions, initializeNotificationHandling, scheduleReminders } from "../../lib/notify";
 import { pickIdea } from "../../lib/picker";
 import { useBreakpoints } from "../../lib/responsive";
-import { loadPrefs, updateHistory } from "../../lib/storage";
+import { consumePendingAction, loadPrefs, updateHistory } from "../../lib/storage";
 import { loadStreak, tickStreak } from "../../lib/streaks";
 import { renderIdeaText } from "../../lib/text";
 import { Idea, Prefs, Recipient } from "../../types";
@@ -44,10 +45,13 @@ export default function Today() {
 
   useEffect(() => {
     (async () => {
+      if (Platform.OS !== "web") {
+        await initializeNotificationHandling();
+      }
       await ensureNotiPermissions();
 
-      let p = (await loadPrefs()) ?? undefined;
-      if (!p || !p.remindAt) {
+      let p = await loadPrefs();
+      if (!p) {
         p = {
           profiles: { spouse: { name: "Spouse" }, kids: [{ id: "k1", name: "Kiddo" }] },
           loveLanguages: ["time", "words"],
@@ -55,18 +59,29 @@ export default function Today() {
           moneyBudget: "budget:$",
           faithMode: false,
           remindAt: "08:00",
+          remindAtWeekday: "08:00",
+          remindAtWeekend: "08:00",
+          catchUpAt: "12:00",
           lastShownIds: [],
         } as Prefs;
+      } else {
+        const weekday = p.remindAtWeekday ?? p.remindAt;
+        const weekend = p.remindAtWeekend ?? p.remindAt;
+        p = {
+          ...p,
+          remindAt: weekday,
+          remindAtWeekday: weekday,
+          remindAtWeekend: weekend,
+          catchUpAt: p.catchUpAt ?? "12:00",
+        };
       }
       setPrefs(p);
 
-      if (Platform.OS !== "web" && p.remindAt) {
-        const [h, m] = p.remindAt.split(":").map(Number);
-        await scheduleDailyLocal(h, m);
+      if (Platform.OS !== "web") {
+        await scheduleReminders(p);
       }
 
       setIdeaCompleted(false);
-
       setIdea(pickIdea(p, recipient, kidId));
 
       const s = await loadStreak();
@@ -81,20 +96,28 @@ export default function Today() {
     }
   }, [recipient, kidId, prefs]);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     if (!prefs) return;
     setIdeaCompleted(false);
     setIdea(pickIdea(prefs, recipient, kidId));
-  };
+  }, [kidId, prefs, recipient]);
 
-  const markDone = async () => {
-    if (!idea) return;
-    await updateHistory(idea.id);
-    const s = await tickStreak();
-    setStreakCurrent(s.current);
-    setIdeaCompleted(true);
-    Alert.alert("Nice!", "Logged for today. Streak updated!");
-  };
+  const markDone = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!idea || !prefs) return;
+      await updateHistory(idea.id);
+      const s = await tickStreak();
+      setStreakCurrent(s.current);
+      setIdeaCompleted(true);
+      if (Platform.OS !== "web") {
+        await scheduleReminders(prefs);
+      }
+      if (!options?.silent) {
+        Alert.alert("Nice!", "Logged for today. Streak updated!");
+      }
+    },
+    [idea, prefs]
+  );
 
   const savePickedMoment = async (uri: string) => {
     if (!prefs || !idea) return;
@@ -132,8 +155,35 @@ export default function Today() {
     if (!result.canceled) await savePickedMoment(result.assets[0].uri);
   };
 
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      (async () => {
+        if (!prefs || !idea) return;
+        const pending = await consumePendingAction();
+        if (!active || !pending) return;
+        if (pending === "mark") {
+          if (!ideaCompleted) {
+            await markDone({ silent: true });
+          }
+        } else if (pending === "swap") {
+          await refresh();
+        }
+      })();
+      return () => {
+        active = false;
+      };
+    }, [idea, ideaCompleted, prefs, refresh, markDone])
+  );
+
   const kids = prefs?.profiles?.kids ?? [];
-  const remindAt = useMemo(() => prefs?.remindAt ?? "08:00", [prefs]);
+  const reminderSummary = useMemo(() => {
+    if (!prefs) return "--";
+    const weekday = prefs.remindAtWeekday ?? prefs.remindAt;
+    const weekend = prefs.remindAtWeekend ?? prefs.remindAt;
+    if (weekday === weekend) return weekday;
+    return `Weekdays ${weekday} / Weekends ${weekend}`;
+  }, [prefs]);
   const segmentItems = useMemo(
     () => [
       { label: "For Spouse", value: "spouse" as Recipient, icon: "heart-outline" as const },
@@ -248,8 +298,8 @@ export default function Today() {
                 </View>
                 <View style={styles.metaCard}>
                   <Ionicons name="time-outline" size={16} color="#a6f6ff" />
-                  <Text style={styles.metaLabel}>Reminder</Text>
-                  <Text style={styles.metaValue}>{remindAt}</Text>
+                  <Text style={styles.metaLabel}>Reminders</Text>
+                  <Text style={styles.metaValue}>{reminderSummary}</Text>
                 </View>
               </View>
 
@@ -261,7 +311,7 @@ export default function Today() {
               ) : (
                 <View style={[styles.heroAction, styles.heroActionGhost]}>
                   <Ionicons name="notifications-outline" size={18} color="#7f8ab8" />
-                  <Text style={styles.heroActionGhostText}>Daily reminder at {remindAt}</Text>
+                  <Text style={styles.heroActionGhostText}>Reminders at {reminderSummary}</Text>
                 </View>
               )}
 
@@ -378,7 +428,7 @@ export default function Today() {
                     styles.actionPrimary,
                     bp.isMobile ? styles.actionButtonFull : undefined,
                   ]}
-                  onPress={markDone}
+                  onPress={() => markDone()}
                 >
                   <Ionicons name="checkmark" size={18} color="#04111d" />
                   <Text style={styles.actionPrimaryText}>Mark done</Text>

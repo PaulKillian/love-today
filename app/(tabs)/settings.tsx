@@ -1,4 +1,4 @@
-﻿import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import dayjs from "dayjs";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useMemo, useState } from "react";
@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { cancelAllLocal, ensureNotiPermissions, scheduleDailyLocal } from "../../lib/notify";
+import { ensureNotiPermissions, scheduleReminders } from "../../lib/notify";
 import { enablePush } from "../../lib/push";
 import { useBreakpoints } from "../../lib/responsive";
 import { loadPrefs, savePrefs } from "../../lib/storage";
@@ -64,6 +64,14 @@ export default function Settings() {
   }, []);
 
   const kids = useMemo(() => prefs?.profiles?.kids ?? [], [prefs]);
+
+  const reminderSummary = useMemo(() => {
+    if (!prefs) return "--";
+    const weekday = prefs.remindAtWeekday || prefs.remindAt || "--:--";
+    const weekend = prefs.remindAtWeekend || prefs.remindAt || "--:--";
+    if (weekday === weekend) return weekday;
+    return `${weekday} weekdays / ${weekend} weekends`;
+  }, [prefs]);
 
   const update = <K extends keyof Prefs>(key: K, value: Prefs[K]) =>
     setPrefs((p) => (p ? { ...p, [key]: value } : p));
@@ -121,18 +129,37 @@ export default function Settings() {
   const saveAll = async () => {
     if (!prefs) return;
 
-    let remindAt = prefs.remindAt || "08:00";
-    const m = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(remindAt);
-    if (!m) {
-      Alert.alert("Reminder time", "Please use HH:mm (24h) format, e.g. 08:00 or 19:30.");
+    const timeRegex = /^([01]?\d|2[0-3]):([0-5]\d)$/;
+    const weekday = (prefs.remindAtWeekday || prefs.remindAt || "08:00").trim();
+    const weekend = (prefs.remindAtWeekend || weekday).trim();
+    const catchUp = (prefs.catchUpAt || "12:00").trim();
+
+    const invalidLabel = !timeRegex.test(weekday)
+      ? "Weekday reminder"
+      : !timeRegex.test(weekend)
+      ? "Weekend reminder"
+      : !timeRegex.test(catchUp)
+      ? "Catch-up nudge"
+      : null;
+
+    if (invalidLabel) {
+      Alert.alert(invalidLabel, "Please use HH:mm (24h) format, e.g. 08:00 or 19:30.");
       return;
     }
 
-    await savePrefs({ ...prefs, remindAt });
+    const nextPrefs: Prefs = {
+      ...prefs,
+      remindAt: weekday,
+      remindAtWeekday: weekday,
+      remindAtWeekend: weekend,
+      catchUpAt: catchUp,
+    };
+
+    await savePrefs(nextPrefs);
 
     try {
       if (Platform.OS === "web") {
-        await ensureWebPushSubscription(remindAt);
+        await ensureWebPushSubscription(weekday);
         const perm = (Notification && Notification.permission) || "default";
         if (perm === "granted" || perm === "denied" || perm === "default") {
           setWebPushPermission(perm);
@@ -144,12 +171,9 @@ export default function Settings() {
         }
       } else {
         await ensureNotiPermissions();
-        const [h, mm] = remindAt.split(":").map(Number);
-        try {
-          await cancelAllLocal();
-        } catch {}
-        await scheduleDailyLocal(h, mm);
+        await scheduleReminders(nextPrefs);
       }
+      setPrefs(nextPrefs);
       setStatus(`Settings saved at ${dayjs().format("h:mm A")}`);
       Alert.alert("Saved", "Your preferences have been updated.");
     } catch (err: any) {
@@ -213,7 +237,7 @@ export default function Settings() {
             </View>
             <View style={styles.reminderBadge}>
               <Ionicons name="time-outline" size={18} color="#050b18" />
-              <Text style={styles.reminderBadgeText}>{prefs.remindAt || "--:--"}</Text>
+              <Text style={styles.reminderBadgeText}>{reminderSummary}</Text>
             </View>
           </LinearGradient>
 
@@ -313,15 +337,36 @@ export default function Settings() {
               </Pressable>
             </View>
 
-            <Text style={styles.label}>Time (24h)</Text>
+            <Text style={styles.label}>Weekday time (24h)</Text>
             <TextInput
-              value={prefs.remindAt || ""}
-              onChangeText={(v) => update("remindAt", v as any)}
+              value={prefs.remindAtWeekday || ""}
+              onChangeText={(v) => update("remindAtWeekday", v as any)}
               placeholder="HH:mm"
               keyboardType="numbers-and-punctuation"
               style={styles.input}
               placeholderTextColor="#6d7aa6"
             />
+
+            <Text style={styles.label}>Weekend time (24h)</Text>
+            <TextInput
+              value={prefs.remindAtWeekend || ""}
+              onChangeText={(v) => update("remindAtWeekend", v as any)}
+              placeholder="HH:mm"
+              keyboardType="numbers-and-punctuation"
+              style={styles.input}
+              placeholderTextColor="#6d7aa6"
+            />
+
+            <Text style={styles.label}>Catch-up nudge (24h)</Text>
+            <TextInput
+              value={prefs.catchUpAt || ""}
+              onChangeText={(v) => update("catchUpAt", v as any)}
+              placeholder="HH:mm"
+              keyboardType="numbers-and-punctuation"
+              style={styles.input}
+              placeholderTextColor="#6d7aa6"
+            />
+            <Text style={styles.helperText}>We'll ping weekdays and weekends at the times above, and send a catch-up nudge if you miss a day.</Text>
 
             {showWebPushRow ? (
               <View style={{ gap: 10 }}>
@@ -341,7 +386,7 @@ export default function Settings() {
                   <Pressable
                     onPress={async () => {
                       try {
-                        await ensureWebPushSubscription(prefs.remindAt || "08:00");
+                        await ensureWebPushSubscription(prefs.remindAtWeekday || prefs.remindAt || "08:00");
                         const perm = (Notification && Notification.permission) || "default";
                         if (perm === "granted" || perm === "denied" || perm === "default") {
                           setWebPushPermission(perm);
@@ -427,6 +472,7 @@ const styles = StyleSheet.create({
   cardTitle: { color: "#f1f5ff", fontWeight: "800", fontSize: 18 },
   label: { color: "#8ba2d6", fontWeight: "700", marginBottom: 6 },
   muted: { color: "#6d7aa6", fontStyle: "italic" },
+  helperText: { color: "#6d7aa6", fontSize: 12, marginTop: 6 },
   input: {
     backgroundColor: "rgba(15,24,44,0.82)",
     borderWidth: 1,
